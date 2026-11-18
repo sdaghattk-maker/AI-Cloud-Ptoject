@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../engine/engine.dart';
 import '../ml/ml_filter.dart';
-import '../services/llm.dart';
+import '../widgets/ai_profile_editor.dart';
 import '../services/settings.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -13,10 +13,6 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final _symbols = TextEditingController(text: Settings.symbols.join(', '));
-  final _base = TextEditingController(text: Settings.llmBaseUrl);
-  final _model = TextEditingController(text: Settings.llmModel);
-  final _key = TextEditingController(text: Settings.llmKey);
-  bool _showKey = false;
   late Future<Map<String, MlModel>> _ml;
 
   @override
@@ -28,9 +24,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void dispose() {
     _symbols.dispose();
-    _base.dispose();
-    _model.dispose();
-    _key.dispose();
     super.dispose();
   }
 
@@ -43,39 +36,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _snack(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-  }
-
-  void _preset(String base, String model) {
-    setState(() {
-      _base.text = base;
-      _model.text = model;
-    });
-  }
-
-  Future<void> _saveLlm() async {
-    await Settings.saveLlm(_base.text, _model.text, _key.text);
-    _snack('تنظیمات AI ذخیره شد');
-  }
-
-  Future<void> _pickModel() async {
-    await Settings.saveLlm(_base.text, _model.text, _key.text);
-    try {
-      final models = await Llm.listModels();
-      if (!mounted) return;
-      final picked = await showModalBottomSheet<String>(
-        context: context,
-        builder: (ctx) => ListView(children: [
-          for (final m in models)
-            ListTile(
-              title: Text(m, textDirection: TextDirection.ltr),
-              onTap: () => Navigator.pop(ctx, m),
-            ),
-        ]),
-      );
-      if (picked != null) setState(() => _model.text = picked);
-    } catch (e) {
-      _snack(e.toString());
-    }
   }
 
   @override
@@ -120,68 +80,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
         const Divider(height: 36),
 
         // ---------------- هوش مصنوعی ----------------
-        const Text('هوش مصنوعی (توضیح سیگنال)',
+        const Text('هوش مصنوعی (توضیح تحلیل)',
             style: TextStyle(fontWeight: FontWeight.w600)),
         const SizedBox(height: 4),
         const Text(
-          'کلید رایگان: Gemini از aistudio.google.com ← Get API key ، یا Groq از console.groq.com. '
-          'AI فقط داده‌های محاسبه‌شده را توضیح می‌دهد. کلید فقط روی همین گوشی ذخیره می‌شود. '
+          'تا دو سرویس AI می‌توانید تنظیم کنید (مثلاً Gemini و Groq). '
+          'کلید رایگان: Gemini از aistudio.google.com ← Get API key ، Groq از console.groq.com. '
+          'AI فقط داده‌های محاسبه‌شده را توضیح می‌دهد. کلیدها فقط روی همین گوشی ذخیره می‌شوند. '
           'در بعضی کشورها این سرویس‌ها بدون VPN باز نمی‌شوند.',
           style: TextStyle(fontSize: 12),
         ),
         const SizedBox(height: 10),
+        const Text('حالت استفاده:'),
+        const SizedBox(height: 6),
         Wrap(spacing: 8, children: [
-          ActionChip(
-            label: const Text('Gemini'),
-            onPressed: () => _preset(
-                'https://generativelanguage.googleapis.com/v1beta/openai/',
-                'gemini-flash-latest'),
+          ChoiceChip(
+            label: const Text('خودکار (اگر اولی خطا داد، دومی)'),
+            selected: Settings.aiMode == 'auto',
+            onSelected: (_) async {
+              await Settings.saveAiMode('auto');
+              if (mounted) setState(() {});
+            },
           ),
-          ActionChip(
-            label: const Text('Groq'),
-            onPressed: () =>
-                _preset('https://api.groq.com/openai/v1', 'llama-3.3-70b-versatile'),
+          ChoiceChip(
+            label: const Text('هر دو (مقایسه پاسخ‌ها)'),
+            selected: Settings.aiMode == 'both',
+            onSelected: (_) async {
+              await Settings.saveAiMode('both');
+              if (mounted) setState(() {});
+            },
           ),
         ]),
-        const SizedBox(height: 10),
-        TextField(
-          controller: _base,
-          textDirection: TextDirection.ltr,
-          keyboardType: TextInputType.url,
-          decoration: const InputDecoration(
-              labelText: 'آدرس پایه API', border: OutlineInputBorder()),
-        ),
-        const SizedBox(height: 10),
-        TextField(
-          controller: _model,
-          textDirection: TextDirection.ltr,
-          decoration: const InputDecoration(
-              labelText: 'نام مدل', border: OutlineInputBorder()),
-        ),
-        const SizedBox(height: 10),
-        TextField(
-          controller: _key,
-          obscureText: !_showKey,
-          textDirection: TextDirection.ltr,
-          decoration: InputDecoration(
-            labelText: 'کلید API',
-            border: const OutlineInputBorder(),
-            suffixIcon: IconButton(
-              icon: Icon(_showKey ? Icons.visibility_off : Icons.visibility),
-              onPressed: () => setState(() => _showKey = !_showKey),
-            ),
-          ),
-        ),
-        const SizedBox(height: 10),
-        Row(children: [
-          Expanded(
-            child: FilledButton(
-                onPressed: _saveLlm, child: const Text('ذخیره تنظیمات AI')),
-          ),
-          const SizedBox(width: 10),
-          OutlinedButton(
-              onPressed: _pickModel, child: const Text('دریافت لیست مدل‌ها')),
-        ]),
+        const SizedBox(height: 8),
+        const AiProfileEditor(index: 0),
+        const AiProfileEditor(index: 1),
         const Divider(height: 36),
 
         // ---------------- وضعیت ML ----------------

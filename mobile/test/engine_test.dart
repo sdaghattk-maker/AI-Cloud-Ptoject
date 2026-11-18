@@ -74,6 +74,7 @@ void main() {
     final r = analyzeCandles('TESTUSDT', '1h', synthetic(5000, 7));
     expect(r.symbol, 'TESTUSDT');
     expect(r.candles, 5000);
+    expect(r.context['lastPrice'], greaterThan(0));
     expect(r.backtest.trades, greaterThanOrEqualTo(0));
     if (r.signal != null) {
       expect(r.edgeOk, true);

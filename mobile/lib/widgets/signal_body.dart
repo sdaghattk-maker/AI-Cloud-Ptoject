@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/signal.dart';
+import '../services/llm.dart';
 import 'ai_card.dart';
 import 'levels_chart.dart';
 import 'risk_calculator.dart';
@@ -76,7 +77,11 @@ class SignalBody extends StatelessWidget {
       ),
       StatsCard(stats: s.backtest),
       MlCard(signal: s),
-      AiAnalysisCard(signal: s),
+      AiAnalysisCard(
+        cacheKey: '${s.symbol}_${s.timeframe}_${s.time}',
+        system: signalSystemPrompt,
+        prompt: buildPrompt(s),
+      ),
       if (s.explanation.isNotEmpty)
         Card(
           child: Padding(

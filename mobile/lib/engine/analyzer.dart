@@ -56,7 +56,7 @@ class SeriesResult {
   const SeriesResult(this.result, this.samples, this.liveX);
 }
 
-double _r2(double v) => (v * 100).round() / 100;
+double _r2(double v) => v.isNaN || v.isInfinite ? 0 : (v * 100).round() / 100;
 
 /// نمونه‌های آموزشی ML: همه سیگنال‌های ورودِ منعطف (adx≥15) با پارامترهای مرجع
 List<TradeSample> _collectSamples(Indicators d, Candles c, Map<double, Signals> sigs) {
@@ -74,12 +74,29 @@ List<TradeSample> _collectSamples(Indicators d, Candles c, Map<double, Signals> 
   ];
 }
 
+/// عکس لحظه‌ای اندیکاتورها در یک کندل (برای نمایش به AI)
+Map<String, double> _contextAt(Indicators d, Candles c, int i) {
+  final price = c.close[i];
+  final atr = d.atr[i];
+  return {
+    'lastPrice': price,
+    'adx': _r2(d.adx[i]),
+    'rsi': _r2(d.rsi[i]),
+    'volRatio': _r2(d.volRatio[i]),
+    'atrPercent': _r2(price > 0 ? atr / price * 100 : 0),
+    'distFromEma50InAtr': _r2(atr > 0 ? (price - d.ema50[i]) / atr : 0),
+    'ema50VsEma200Percent':
+        _r2(d.ema200[i] > 0 ? (d.ema50[i] - d.ema200[i]) / d.ema200[i] * 100 : 0),
+  };
+}
+
 SeriesResult analyzeSeries(String symbol, String tf, Candles c) {
   const train = 2000, test = 500;
   final n = c.length;
   final d = computeIndicators(c);
   final sigs = {for (final a in adxGrid) a: buildSignals(d, a)};
   final samples = n >= 250 ? _collectSamples(d, c, sigs) : <TradeSample>[];
+  final ctx = n == 0 ? <String, double>{} : _contextAt(d, c, n - 1);
 
   final oosTrades = <Trade>[];
   var start = 200;
@@ -101,7 +118,8 @@ SeriesResult analyzeSeries(String symbol, String tf, Candles c) {
           candles: n,
           edgeOk: edge,
           backtest: oos,
-          signal: s),
+          signal: s,
+          context: ctx),
       samples,
       x);
 
@@ -133,14 +151,7 @@ SeriesResult analyzeSeries(String symbol, String tf, Candles c) {
     tp2: entry + side * risk * finalP.rr2,
     riskPct: risk / entry * 100,
     backtest: oos,
-    context: {
-      'adx': _r2(d.adx[last]),
-      'rsi': _r2(d.rsi[last]),
-      'volRatio': _r2(d.volRatio[last]),
-      'atrPercent': _r2(atr / entry * 100),
-      'distFromEma50InAtr': _r2((entry - d.ema50[last]) / atr),
-      'ema50VsEma200Percent': _r2((d.ema50[last] - d.ema200[last]) / d.ema200[last] * 100),
-    },
+    context: ctx,
   );
   final signal = base.copyWith(explanation: explanationFor(base));
   return out(true, signal, featuresAt(d, last, side));

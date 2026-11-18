@@ -24,7 +24,8 @@ class Engine {
         edgeOk: r.edgeOk,
         backtest: r.backtest,
         signal: ns,
-        note: note);
+        note: note,
+        context: r.context);
 
     if (model == null) {
       final u = sig.copyWith(

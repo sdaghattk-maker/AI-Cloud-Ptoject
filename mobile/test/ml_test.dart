@@ -5,7 +5,9 @@ import 'package:cryptosignal/engine/engine.dart';
 import 'package:cryptosignal/ml/logistic.dart';
 import 'package:cryptosignal/ml/ml_filter.dart';
 import 'package:cryptosignal/models/signal.dart';
+import 'package:cryptosignal/services/errors.dart';
 import 'package:cryptosignal/services/llm.dart';
+import 'package:cryptosignal/services/settings.dart';
 
 List<TradeSample> makeSamples(int n, int seed, {required bool informative}) {
   final rnd = Random(seed);
@@ -135,5 +137,39 @@ void main() {
     expect(p, contains('BTCUSDT'));
     expect(p, contains('100.00'));
     expect(p, contains('1:3.0'));
+  });
+
+  test('state prompt explains a no-signal result without inventing data', () {
+    final r = AnalyzeResult(
+        symbol: 'ETHUSDT',
+        timeframe: '4h',
+        candles: 5000,
+        edgeOk: false,
+        backtest: sampleSignal().backtest,
+        signal: null,
+        context: const {'lastPrice': 3000.0, 'adx': 18.5});
+    final p = buildStatePrompt(r);
+    expect(p, contains('ETHUSDT'));
+    expect(p, contains('ندارد'));
+    expect(p, contains('adx=18.5'));
+    expect(p, contains('لبه آماری'));
+  });
+
+  test('AiProfile readiness and labels', () {
+    expect(const AiProfile().ready, false);
+    const g = AiProfile(
+        baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+        model: 'm',
+        key: 'k');
+    expect(g.ready, true);
+    expect(g.label(0), 'Gemini');
+    expect(const AiProfile(baseUrl: 'https://api.groq.com/openai/v1').label(1), 'Groq');
+    expect(const AiProfile(baseUrl: 'https://x.example').label(1), 'AI 2');
+  });
+
+  test('asking AI without any configured profile fails with a clear error', () async {
+    Settings.aiProfiles = [const AiProfile(), const AiProfile()];
+    await expectLater(
+        Llm.ask('k', stateSystemPrompt, 'p'), throwsA(isA<ApiException>()));
   });
 }

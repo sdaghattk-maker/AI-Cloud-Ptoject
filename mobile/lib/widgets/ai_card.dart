@@ -34,10 +34,17 @@ class MlCard extends StatelessWidget {
   }
 }
 
-/// کارت تحلیل هوشمند: LLM همان داده‌های محاسبه‌شده را به زبان ساده توضیح می‌دهد
+/// کارت تحلیل هوشمند: هم برای سیگنال و هم برای حالت «بدون سیگنال» استفاده می‌شود.
+/// بسته به تنظیمات، پاسخ یک AI یا مقایسه پاسخ دو AI را نشان می‌دهد.
 class AiAnalysisCard extends StatefulWidget {
-  const AiAnalysisCard({super.key, required this.signal});
-  final Signal signal;
+  const AiAnalysisCard({
+    super.key,
+    required this.cacheKey,
+    required this.system,
+    required this.prompt,
+    this.title = 'تحلیل هوشمند (AI)',
+  });
+  final String cacheKey, system, prompt, title;
 
   @override
   State<AiAnalysisCard> createState() => _AiAnalysisCardState();
@@ -45,7 +52,8 @@ class AiAnalysisCard extends StatefulWidget {
 
 class _AiAnalysisCardState extends State<AiAnalysisCard> {
   bool _loading = false;
-  String? _text, _error;
+  List<AiAnswer>? _answers;
+  String? _error;
 
   Future<void> _run() async {
     setState(() {
@@ -53,9 +61,9 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
       _error = null;
     });
     try {
-      final t = await Llm.analyze(widget.signal);
+      final a = await Llm.ask(widget.cacheKey, widget.system, widget.prompt);
       if (!mounted) return;
-      setState(() => _text = t);
+      setState(() => _answers = a);
     } on ApiException catch (e) {
       if (!mounted) return;
       setState(() => _error = e.message);
@@ -70,25 +78,26 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('تحلیل هوشمند (AI)',
-              style: TextStyle(fontWeight: FontWeight.w600)),
+          Text(widget.title, style: const TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
           if (!Settings.llmReady)
             const Text(
-              'برای فعال‌سازی: تب «تنظیمات» ← بخش «هوش مصنوعی»، یک کلید رایگان وارد کنید.',
+              'برای فعال‌سازی: تب «تنظیمات» ← «هوش مصنوعی»، آدرس و مدل و کلید را وارد و ذخیره کنید. '
+              'سپس به همین صفحه برگردید.',
               style: TextStyle(fontSize: 12),
             )
           else ...[
             FilledButton.icon(
               onPressed: _loading ? null : _run,
               icon: const Icon(Icons.auto_awesome),
-              label: Text(_text == null ? 'تحلیل هوشمند' : 'تحلیل دوباره'),
+              label: Text(_answers == null ? 'تحلیل هوشمند' : 'تحلیل دوباره'),
             ),
             const SizedBox(height: 10),
             if (_loading) const LinearProgressIndicator(),
             if (_error != null) Text(_error!),
-            if (_text != null) SelectableText(_text!),
-            if (_text != null)
+            if (_answers != null)
+              for (final a in _answers!) _answerView(a),
+            if (_answers != null)
               const Padding(
                 padding: EdgeInsets.only(top: 8),
                 child: Text(
@@ -99,6 +108,20 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
           ],
         ]),
       ),
+    );
+  }
+
+  Widget _answerView(AiAnswer a) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6, bottom: 6),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('${a.label} · ${a.model}',
+            textDirection: TextDirection.ltr,
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 4),
+        a.ok ? SelectableText(a.text) : Text('خطا: ${a.text}'),
+        const Divider(),
+      ]),
     );
   }
 }

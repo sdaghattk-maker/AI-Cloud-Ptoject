@@ -100,6 +100,7 @@ class AnalyzeResult {
   final bool edgeOk;
   final BacktestStats backtest;
   final Signal? signal;
+  final Map<String, double> context; // وضعیت اندیکاتورها در آخرین کندل
 
   const AnalyzeResult({
     required this.symbol,
@@ -109,6 +110,7 @@ class AnalyzeResult {
     required this.backtest,
     required this.signal,
     this.note = '',
+    this.context = const {},
   });
 
   factory AnalyzeResult.fromJson(Map<String, dynamic> j) => AnalyzeResult(

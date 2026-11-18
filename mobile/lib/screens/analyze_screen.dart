@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/signal.dart';
 import '../services/api.dart';
+import '../services/llm.dart';
+import '../widgets/ai_card.dart';
 import '../widgets/signal_body.dart';
 import '../widgets/stats_card.dart';
 
@@ -100,6 +102,12 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
         ),
       ),
       StatsCard(stats: r.backtest),
+      AiAnalysisCard(
+        title: 'توضیح AI درباره وضعیت فعلی',
+        cacheKey: '${r.symbol}_${r.timeframe}_${r.context['lastPrice']}',
+        system: stateSystemPrompt,
+        prompt: buildStatePrompt(r),
+      ),
       const Padding(
         padding: EdgeInsets.all(8),
         child: Text(disclaimer, style: TextStyle(fontSize: 11)),
