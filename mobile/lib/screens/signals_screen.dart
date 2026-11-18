@@ -15,6 +15,7 @@ class _SignalsScreenState extends State<SignalsScreen> {
   bool _loading = true;
   String? _error;
   String _filter = 'ALL';
+  int _done = 0, _total = 0;
 
   @override
   void initState() {
@@ -26,9 +27,17 @@ class _SignalsScreenState extends State<SignalsScreen> {
     setState(() {
       _loading = true;
       _error = null;
+      _done = 0;
+      _total = 0;
     });
     try {
-      final data = await Api().scan();
+      final data = await Api().scan(onProgress: (d, t) {
+        if (!mounted) return;
+        setState(() {
+          _done = d;
+          _total = t;
+        });
+      });
       if (!mounted) return;
       setState(() => _all = data);
     } catch (e) {
@@ -70,14 +79,17 @@ class _SignalsScreenState extends State<SignalsScreen> {
 
   Widget _content(List<Signal> list) {
     if (_loading) {
-      return const Center(
+      return Center(
         child: Padding(
-          padding: EdgeInsets.all(24),
+          padding: const EdgeInsets.all(24),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
-            CircularProgressIndicator(),
-            SizedBox(height: 16),
-            Text('در حال اسکن بازار و بک‌تست…\nاولین اسکن ممکن است چند دقیقه طول بکشد.',
-                textAlign: TextAlign.center),
+            LinearProgressIndicator(value: _total == 0 ? null : _done / _total),
+            const SizedBox(height: 16),
+            Text(
+              'در حال دریافت داده و بک‌تست روی گوشی… ($_done از $_total)\n'
+              'برنامه را باز نگه دارید؛ ممکن است ۱ تا ۳ دقیقه طول بکشد.',
+              textAlign: TextAlign.center,
+            ),
           ]),
         ),
       );

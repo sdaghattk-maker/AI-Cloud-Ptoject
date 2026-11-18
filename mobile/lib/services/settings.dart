@@ -1,17 +1,22 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 class Settings {
-  /// 10.0.2.2 = localhost کامپیوتر از داخل شبیه‌ساز اندروید
-  static String baseUrl = 'http://10.0.2.2:8000';
+  static const defaultSymbols = [
+    'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'XRPUSDT',
+    'ADAUSDT', 'DOGEUSDT', 'AVAXUSDT', 'LINKUSDT', 'TONUSDT',
+  ];
+
+  static List<String> symbols = List.of(defaultSymbols);
 
   static Future<void> load() async {
     final p = await SharedPreferences.getInstance();
-    baseUrl = p.getString('baseUrl') ?? baseUrl;
+    final saved = p.getStringList('symbols');
+    if (saved != null && saved.isNotEmpty) symbols = saved;
   }
 
-  static Future<void> save(String url) async {
-    baseUrl = url.trim();
+  static Future<void> saveSymbols(List<String> list) async {
+    symbols = list;
     final p = await SharedPreferences.getInstance();
-    await p.setString('baseUrl', baseUrl);
+    await p.setStringList('symbols', list);
   }
 }
