@@ -31,8 +31,10 @@ class BacktestStats {
 }
 
 class Signal {
-  final String symbol, timeframe, side, time, explanation;
+  final String symbol, timeframe, side, time, explanation, mlStatus;
   final double score, entry, sl, tp1, tp2, riskPct;
+  final double? mlProb; // احتمال موفقیت از مدل ML (در صورت وجود)
+  final Map<String, double> context; // عکس لحظه‌ای اندیکاتورها برای توضیح AI
   final BacktestStats backtest;
 
   const Signal({
@@ -48,7 +50,28 @@ class Signal {
     required this.tp2,
     required this.riskPct,
     required this.backtest,
+    this.mlProb,
+    this.mlStatus = '',
+    this.context = const {},
   });
+
+  Signal copyWith({String? explanation, double? mlProb, String? mlStatus}) => Signal(
+        symbol: symbol,
+        timeframe: timeframe,
+        side: side,
+        time: time,
+        explanation: explanation ?? this.explanation,
+        score: score,
+        entry: entry,
+        sl: sl,
+        tp1: tp1,
+        tp2: tp2,
+        riskPct: riskPct,
+        backtest: backtest,
+        mlProb: mlProb ?? this.mlProb,
+        mlStatus: mlStatus ?? this.mlStatus,
+        context: context,
+      );
 
   bool get isLong => side == 'LONG';
   double get riskDistance => (entry - sl).abs();
@@ -72,7 +95,7 @@ class Signal {
 }
 
 class AnalyzeResult {
-  final String symbol, timeframe;
+  final String symbol, timeframe, note;
   final int candles;
   final bool edgeOk;
   final BacktestStats backtest;
@@ -85,6 +108,7 @@ class AnalyzeResult {
     required this.edgeOk,
     required this.backtest,
     required this.signal,
+    this.note = '',
   });
 
   factory AnalyzeResult.fromJson(Map<String, dynamic> j) => AnalyzeResult(

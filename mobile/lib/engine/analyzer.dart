@@ -1,4 +1,6 @@
 import 'dart:math' as math;
+import '../ml/features.dart';
+import '../ml/ml_filter.dart';
 import '../models/signal.dart';
 import 'backtest.dart';
 import 'binance.dart';
@@ -38,18 +40,46 @@ Params? _optimize(Indicators d, Map<double, Signals> sigs, int start, int end,
 String explanationFor(Signal s) {
   final dir = s.isLong ? 'خرید (Long)' : 'فروش (Short)';
   final b = s.backtest;
+  final ml = s.mlStatus.isEmpty ? '' : ' ${s.mlStatus}';
   return '${s.symbol} در تایم‌فریم ${s.timeframe} سیگنال $dir دارد؛ روند و مومنتوم هم‌جهت‌اند. '
       'ورود ${fmt(s.entry)}، حد ضرر ${fmt(s.sl)}، هدف‌ها ${fmt(s.tp1)} و ${fmt(s.tp2)}. '
       'در آزمون خارج از نمونه: ${b.trades} معامله، وین‌ریت ${b.winRate}٪، '
-      'میانگین ${b.expectancyR}R. این تحلیل توصیه مالی نیست؛ ریسک هر معامله را کوچک نگه دارید.';
+      'میانگین ${b.expectancyR}R.$ml '
+      'این تحلیل توصیه مالی نیست؛ ریسک هر معامله را کوچک نگه دارید.';
 }
 
-/// تحلیل کامل: Walk-Forward روی کندل‌های گذشته + سیگنال کندل آخر
-AnalyzeResult analyzeCandles(String symbol, String tf, Candles c) {
+/// نتیجه تحلیل یک سری + داده‌های لازم برای آموزش/اعمال فیلتر ML
+class SeriesResult {
+  final AnalyzeResult result;
+  final List<TradeSample> samples; // معاملات تاریخی با ویژگی‌هایشان
+  final List<double>? liveX; // ویژگی‌های سیگنال فعلی (اگر باشد)
+  const SeriesResult(this.result, this.samples, this.liveX);
+}
+
+double _r2(double v) => (v * 100).round() / 100;
+
+/// نمونه‌های آموزشی ML: همه سیگنال‌های ورودِ منعطف (adx≥15) با پارامترهای مرجع
+List<TradeSample> _collectSamples(Indicators d, Candles c, Map<double, Signals> sigs) {
+  final n = c.length;
+  const ref = Params(15, 1.5, 2.0);
+  final trades = runBacktest(d, sigs[15.0]!, ref, 200, n);
+  return [
+    for (final t in trades)
+      TradeSample(
+        timeMs: c.times[t.bar],
+        endMs: c.times[math.min(t.bar + t.bars, n - 1)],
+        x: featuresAt(d, t.bar, t.side),
+        r: t.r,
+      )
+  ];
+}
+
+SeriesResult analyzeSeries(String symbol, String tf, Candles c) {
   const train = 2000, test = 500;
   final n = c.length;
   final d = computeIndicators(c);
   final sigs = {for (final a in adxGrid) a: buildSignals(d, a)};
+  final samples = n >= 250 ? _collectSamples(d, c, sigs) : <TradeSample>[];
 
   final oosTrades = <Trade>[];
   var start = 200;
@@ -64,15 +94,18 @@ AnalyzeResult analyzeCandles(String symbol, String tf, Candles c) {
   final oos = statsOf(oosTrades);
   final finalP = _optimize(d, sigs, math.max(200, n - train), n);
 
-  AnalyzeResult result(bool edge, Signal? s) => AnalyzeResult(
-      symbol: symbol,
-      timeframe: tf,
-      candles: n,
-      edgeOk: edge,
-      backtest: oos,
-      signal: s);
+  SeriesResult out(bool edge, Signal? s, List<double>? x) => SeriesResult(
+      AnalyzeResult(
+          symbol: symbol,
+          timeframe: tf,
+          candles: n,
+          edgeOk: edge,
+          backtest: oos,
+          signal: s),
+      samples,
+      x);
 
-  if (finalP == null || n < 250) return result(false, null);
+  if (finalP == null || n < 250) return out(false, null, null);
 
   final edgeOk = oos.trades >= minOosTrades &&
       oos.expectancyR > minOosExpectancy &&
@@ -81,11 +114,12 @@ AnalyzeResult analyzeCandles(String symbol, String tf, Candles c) {
   final sig = sigs[finalP.adxMin]!;
   final last = n - 1;
   final side = sig.side[last];
-  if (side == 0 || !edgeOk) return result(edgeOk, null);
+  if (side == 0 || !edgeOk) return out(edgeOk, null, null);
 
   final entry = c.close[last];
-  final risk = finalP.atrSl * d.atr[last];
-  final s = Signal(
+  final atr = d.atr[last];
+  final risk = finalP.atrSl * atr;
+  final base = Signal(
     symbol: symbol,
     timeframe: tf,
     side: side == 1 ? 'LONG' : 'SHORT',
@@ -99,20 +133,19 @@ AnalyzeResult analyzeCandles(String symbol, String tf, Candles c) {
     tp2: entry + side * risk * finalP.rr2,
     riskPct: risk / entry * 100,
     backtest: oos,
+    context: {
+      'adx': _r2(d.adx[last]),
+      'rsi': _r2(d.rsi[last]),
+      'volRatio': _r2(d.volRatio[last]),
+      'atrPercent': _r2(atr / entry * 100),
+      'distFromEma50InAtr': _r2((entry - d.ema50[last]) / atr),
+      'ema50VsEma200Percent': _r2((d.ema50[last] - d.ema200[last]) / d.ema200[last] * 100),
+    },
   );
-  final withText = Signal(
-    symbol: s.symbol,
-    timeframe: s.timeframe,
-    side: s.side,
-    time: s.time,
-    explanation: explanationFor(s),
-    score: s.score,
-    entry: s.entry,
-    sl: s.sl,
-    tp1: s.tp1,
-    tp2: s.tp2,
-    riskPct: s.riskPct,
-    backtest: s.backtest,
-  );
-  return result(true, withText);
+  final signal = base.copyWith(explanation: explanationFor(base));
+  return out(true, signal, featuresAt(d, last, side));
 }
+
+/// سازگار با نسخه قبل (بدون ML)
+AnalyzeResult analyzeCandles(String symbol, String tf, Candles c) =>
+    analyzeSeries(symbol, tf, c).result;

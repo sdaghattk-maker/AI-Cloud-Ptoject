@@ -89,7 +89,9 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
         child: Padding(
           padding: const EdgeInsets.all(14),
           child: Text(
-            r.edgeOk
+            r.note.isNotEmpty
+                ? r.note
+                : r.edgeOk
                 ? 'در حال حاضر شرایط ورود برای ${r.symbol} (${r.timeframe}) فعال نیست. '
                     'صبر کنید تا الگو کامل شود.'
                 : 'برای ${r.symbol} در ${r.timeframe} لبه آماری قابل‌اعتمادی در بک‌تست '
