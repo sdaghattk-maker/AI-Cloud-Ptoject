@@ -56,6 +56,29 @@ String buildStatePrompt(AnalyzeResult r) {
       'و هزینه کارمزد از ۲۵٪ ریسک بیشتر نشود.';
 }
 
+/// استخراج پیام خطا از بدنه پاسخ سرویس (برای نمایش علت واقعی به کاربر)
+String apiErrorDetail(String body) {
+  try {
+    final j = jsonDecode(body);
+    final e = (j is List && j.isNotEmpty) ? j.first : j;
+    if (e is Map<String, dynamic>) {
+      final err = e['error'];
+      String? m;
+      if (err is Map<String, dynamic>) {
+        m = err['message']?.toString();
+      } else if (err != null) {
+        m = err.toString();
+      }
+      m ??= e['message']?.toString();
+      if (m != null && m.trim().isNotEmpty) {
+        final t = m.trim().replaceAll('\n', ' ');
+        return t.length > 180 ? '${t.substring(0, 180)}…' : t;
+      }
+    }
+  } catch (_) {}
+  return '';
+}
+
 class AiAnswer {
   final String label, model, text;
   final bool ok;
@@ -78,22 +101,34 @@ class Llm {
         'Authorization': 'Bearer ${p.key}',
       };
 
-  static ApiException _httpError(int code) {
+  static ApiException _httpError(int code, [String detail = '']) {
+    final d = detail.isEmpty ? '' : '\nجزئیات سرویس: $detail';
     if (code == 401 || code == 403) {
-      return ApiException('کلید API نامعتبر است یا اجازه دسترسی ندارد.');
+      return ApiException('کلید API نامعتبر است یا اجازه دسترسی ندارد.$d');
     }
     if (code == 404) {
-      return ApiException('مدل یا آدرس پیدا نشد. نام مدل را از «دریافت لیست مدل‌ها» انتخاب کنید.');
+      return ApiException(
+          'مدل یا آدرس پیدا نشد. نام مدل را از «دریافت لیست مدل‌ها» انتخاب کنید.$d');
+    }
+    if (code == 400) {
+      return ApiException(
+          'درخواست پذیرفته نشد (400). معمولاً نام مدل منسوخ یا اشتباه است؛ '
+          'از «دریافت لیست مدل‌ها» یک مدل فعلی انتخاب کنید.$d');
     }
     if (code == 429) {
-      return ApiException('سقف درخواست رایگان پر شده؛ کمی بعد دوباره امتحان کنید.');
+      return ApiException('سقف درخواست رایگان پر شده؛ کمی بعد دوباره امتحان کنید.$d');
     }
-    return ApiException('خطای سرویس AI ($code).');
+    if (code == 500 || code == 502 || code == 503 || code == 504) {
+      return ApiException(
+          'سرویس موقتاً شلوغ یا در دسترس نیست ($code). چند دقیقه بعد دوباره امتحان کنید '
+          'یا مدل سبک‌تر (مثلاً نسخه flash-lite) را انتخاب کنید.$d');
+    }
+    return ApiException('خطای سرویس AI ($code).$d');
   }
 
   static Future<String> _chat(AiProfile p, String system, String user) async {
     try {
-      final r = await http
+      Future<http.Response> send() => http
           .post(
             _uri(p, '/chat/completions'),
             headers: _headers(p),
@@ -107,7 +142,14 @@ class Llm {
             }),
           )
           .timeout(const Duration(seconds: 60));
-      if (r.statusCode != 200) throw _httpError(r.statusCode);
+      var r = await send();
+      if (r.statusCode == 502 || r.statusCode == 503 || r.statusCode == 504) {
+        await Future<void>.delayed(const Duration(seconds: 3)); // شلوغی گذرا؛ یک بار دیگر
+        r = await send();
+      }
+      if (r.statusCode != 200) {
+        throw _httpError(r.statusCode, apiErrorDetail(utf8.decode(r.bodyBytes)));
+      }
       final data = jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, dynamic>;
       final first = (data['choices'] as List<dynamic>).first as Map<String, dynamic>;
       final text = ((first['message'] as Map<String, dynamic>)['content'] as String).trim();
@@ -173,7 +215,9 @@ class Llm {
       final r = await http
           .get(_uri(p, '/models'), headers: _headers(p))
           .timeout(const Duration(seconds: 30));
-      if (r.statusCode != 200) throw _httpError(r.statusCode);
+      if (r.statusCode != 200) {
+        throw _httpError(r.statusCode, apiErrorDetail(utf8.decode(r.bodyBytes)));
+      }
       final data = jsonDecode(utf8.decode(r.bodyBytes)) as Map<String, dynamic>;
       final list = (data['data'] ?? data['models'] ?? <dynamic>[]) as List<dynamic>;
       final ids = list

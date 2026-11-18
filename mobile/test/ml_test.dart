@@ -172,4 +172,13 @@ void main() {
     await expectLater(
         Llm.ask('k', stateSystemPrompt, 'p'), throwsA(isA<ApiException>()));
   });
+
+  test('apiErrorDetail extracts the real service message', () {
+    expect(apiErrorDetail('{"error":{"message":"model decommissioned","code":"x"}}'),
+        'model decommissioned');
+    expect(apiErrorDetail('[{"error":{"message":"overloaded"}}]'), 'overloaded');
+    expect(apiErrorDetail('not json'), '');
+    expect(apiErrorDetail('{"error":"plain text error"}'), 'plain text error');
+    expect(apiErrorDetail('{"error":{"message":"${'x' * 300}"}}').length, lessThan(200));
+  });
 }
