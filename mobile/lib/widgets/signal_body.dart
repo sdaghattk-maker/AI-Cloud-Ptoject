@@ -43,6 +43,11 @@ class SignalBody extends StatelessWidget {
         Text('${s.symbol} · ${s.timeframe}',
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
       ]),
+      if (s.strategy.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Text('استراتژی: ${s.strategy}', style: const TextStyle(fontSize: 12)),
+        ),
       const SizedBox(height: 8),
       LevelsChart(signal: s),
       Card(

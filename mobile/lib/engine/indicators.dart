@@ -88,6 +88,7 @@ List<double> macdHist(List<double> close) {
 class Indicators {
   final Candles c;
   final List<double> ema50, ema200, rsi, atr, adx, macdH, volRatio, rsiMin5, rsiMax5;
+  final List<double> bbUp, bbLo; // باند بولینگر (۲۰، ۲ انحراف معیار)
   Indicators({
     required this.c,
     required this.ema50,
@@ -99,6 +100,8 @@ class Indicators {
     required this.volRatio,
     required this.rsiMin5,
     required this.rsiMax5,
+    required this.bbUp,
+    required this.bbLo,
   });
 }
 
@@ -126,6 +129,23 @@ Indicators computeIndicators(Candles c) {
     rmin[i] = lo;
     rmax[i] = hi;
   }
+  final bbUp = List<double>.filled(n, double.nan);
+  final bbLo = List<double>.filled(n, double.nan);
+  for (var i = 19; i < n; i++) {
+    var sum20 = 0.0;
+    for (var k = i - 19; k <= i; k++) {
+      sum20 += c.close[k];
+    }
+    final m = sum20 / 20;
+    var v = 0.0;
+    for (var k = i - 19; k <= i; k++) {
+      final dd = c.close[k] - m;
+      v += dd * dd;
+    }
+    final sd = math.sqrt(v / 20);
+    bbUp[i] = m + 2 * sd;
+    bbLo[i] = m - 2 * sd;
+  }
   return Indicators(
     c: c,
     ema50: ema(c.close, 50),
@@ -137,5 +157,7 @@ Indicators computeIndicators(Candles c) {
     volRatio: volRatio,
     rsiMin5: rmin,
     rsiMax5: rmax,
+    bbUp: bbUp,
+    bbLo: bbLo,
   );
 }

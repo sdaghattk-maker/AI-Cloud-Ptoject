@@ -10,6 +10,7 @@ String fmt(double v) {
 class BacktestStats {
   final int trades;
   final double winRate, expectancyR, profitFactor, maxDdR, totalR;
+  final double tStat; // معناداری آماری میانگین R (هرچه بزرگ‌تر، کمتر شانسی)
 
   const BacktestStats({
     required this.trades,
@@ -18,6 +19,7 @@ class BacktestStats {
     required this.profitFactor,
     required this.maxDdR,
     required this.totalR,
+    this.tStat = 0,
   });
 
   factory BacktestStats.fromJson(Map<String, dynamic> j) => BacktestStats(
@@ -27,11 +29,12 @@ class BacktestStats {
         profitFactor: _d(j['profit_factor']),
         maxDdR: _d(j['max_dd_R']),
         totalR: _d(j['total_R']),
+        tStat: _d(j['t_stat']),
       );
 }
 
 class Signal {
-  final String symbol, timeframe, side, time, explanation, mlStatus;
+  final String symbol, timeframe, side, time, explanation, mlStatus, strategy;
   final double score, entry, sl, tp1, tp2, riskPct;
   final double? mlProb; // احتمال موفقیت از مدل ML (در صورت وجود)
   final Map<String, double> context; // عکس لحظه‌ای اندیکاتورها برای توضیح AI
@@ -52,6 +55,7 @@ class Signal {
     required this.backtest,
     this.mlProb,
     this.mlStatus = '',
+    this.strategy = '',
     this.context = const {},
   });
 
@@ -70,6 +74,7 @@ class Signal {
         backtest: backtest,
         mlProb: mlProb ?? this.mlProb,
         mlStatus: mlStatus ?? this.mlStatus,
+        strategy: strategy,
         context: context,
       );
 

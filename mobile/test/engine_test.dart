@@ -6,7 +6,7 @@ import 'package:cryptosignal/engine/binance.dart';
 import 'package:cryptosignal/engine/indicators.dart';
 import 'package:cryptosignal/engine/strategy.dart';
 
-Candles synthetic(int n, int seed) {
+Candles synthetic(int n, int seed, {double vol = 0.006}) {
   final rnd = Random(seed);
   double gauss() {
     final u1 = 1 - rnd.nextDouble();
@@ -18,14 +18,14 @@ Candles synthetic(int n, int seed) {
   final c = <double>[], v = <double>[];
   var price = 100.0, drift = 0.0;
   for (var i = 0; i < n; i++) {
-    if (i % 250 == 0) drift = gauss() * 0.0012;
+    if (i % 250 == 0) drift = gauss() * 0.0012 * vol / 0.006;
     final open = price;
-    price = price * exp(drift + gauss() * 0.006);
+    price = price * exp(drift + gauss() * vol);
     times.add(i * 3600000);
     o.add(open);
     c.add(price);
-    h.add(max(open, price) * (1 + (gauss() * 0.003).abs()));
-    l.add(min(open, price) * (1 - (gauss() * 0.003).abs()));
+    h.add(max(open, price) * (1 + (gauss() * 0.003 * vol / 0.006).abs()));
+    l.add(min(open, price) * (1 - (gauss() * 0.003 * vol / 0.006).abs()));
     v.add(exp(10 + gauss() * 0.4));
   }
   return Candles(times, o, h, l, c, v);
@@ -79,6 +79,63 @@ void main() {
     if (r.signal != null) {
       expect(r.edgeOk, true);
       expect(r.signal!.explanation, isNotEmpty);
+    }
+  });
+
+  test('all strategy builders are causal (no look-ahead)', () {
+    final full = synthetic(1500, 3);
+    for (final p in [
+      const Params(20, 1.5, 2.0),
+      const Params(0, 1.5, 2.0, strategy: 1, param: 20),
+      const Params(0, 1.5, 2.0, strategy: 1, param: 50),
+      const Params(0, 1.5, 2.0, strategy: 2, param: 30),
+    ]) {
+      final a = buildFor(computeIndicators(full), p).side;
+      final b = buildFor(computeIndicators(cut(full, 1000)), p).side;
+      expect(a.sublist(0, 1000), b, reason: 'strategy ${p.key}');
+    }
+  });
+
+  test('param grid has 42 combos over 7 distinct signal sets', () {
+    expect(paramGrid.length, 42);
+    expect(paramGrid.map((p) => p.key).toSet().length, 7);
+    expect(paramGrid.where((p) => p.strategy == 1).length, 12);
+    expect(paramGrid.where((p) => p.strategy == 2).length, 12);
+  });
+
+  test('cost filter: round-trip costs vs risk', () {
+    expect(costInR(100, 0.5), greaterThan(maxCostR)); // stop 0.5% -> too costly
+    expect(costInR(100, 2.0), lessThanOrEqualTo(maxCostR)); // stop 2% -> fine
+    expect(costInR(100, 0), double.infinity);
+  });
+
+  test('backtest skips every signal when costs dominate (tiny volatility)', () {
+    final c = synthetic(1000, 5, vol: 0.0005);
+    final d = computeIndicators(c);
+    final side = List<int>.filled(1000, 0);
+    for (var i = 300; i < 900; i += 50) {
+      side[i] = 1;
+    }
+    final sig = Signals(side, List<double>.filled(1000, 50));
+    final tr = runBacktest(d, sig, const Params(15, 1.5, 2.0), 200, 1000);
+    expect(tr, isEmpty);
+  });
+
+  test('statsOf reports a positive t-stat for consistently positive R', () {
+    final tr = [
+      for (var i = 0; i < 40; i++) Trade(i.isEven ? 1.0 : 0.6, i, 1, 5),
+    ];
+    final st = statsOf(tr);
+    expect(st.tStat, greaterThan(5));
+    expect(statsOf(const []).tStat, 0);
+  });
+
+  test('every produced signal names its strategy and passes the cost filter', () {
+    final r = analyzeCandles('TESTUSDT', '1h', synthetic(5000, 7));
+    final s = r.signal;
+    if (s != null) {
+      expect(strategyNames, contains(s.strategy));
+      expect(costInR(s.entry, (s.entry - s.sl).abs()), lessThanOrEqualTo(maxCostR));
     }
   });
 }

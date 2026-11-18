@@ -8,6 +8,13 @@ const double slippage = 0.0003;
 const int maxHold = 100;
 const double rr1 = 1.0;
 
+/// حداکثر هزینه مجاز (کارمزد رفت‌وبرگشت + لغزش) بر حسب کسری از ریسک (R).
+/// معامله‌ای که هزینه‌اش بیش از این باشد، از ابتدا ارزش ورود ندارد.
+const double maxCostR = 0.25;
+
+double costInR(double entry, double risk) =>
+    risk > 0 ? (fee * 2 + slippage) * entry / risk : double.infinity;
+
 class Trade {
   final double r;
   final int bar, side, bars;
@@ -30,7 +37,7 @@ List<Trade> runBacktest(
     final k0 = i + 1;
     final e = o[k0] * (1 + slippage * s);
     final risk = p.atrSl * d.atr[i];
-    if (!(risk > 0)) {
+    if (!(risk > 0) || costInR(e, risk) > maxCostR) {
       i++;
       continue;
     }
@@ -100,6 +107,14 @@ BacktestStats statsOf(List<Trade> tr) {
     if (eq > peak) peak = eq;
     if (peak - eq > dd) dd = peak - eq;
   }
+  final mean = sum / tr.length;
+  var varSum = 0.0;
+  for (final t in tr) {
+    final dd = t.r - mean;
+    varSum += dd * dd;
+  }
+  final sd = tr.length > 1 ? math.sqrt(varSum / (tr.length - 1)) : 0.0;
+  final tStat = sd > 0 ? mean / (sd / math.sqrt(tr.length)) : 0.0;
   return BacktestStats(
     trades: tr.length,
     winRate: _round(wins / tr.length * 100, 1),
@@ -107,5 +122,6 @@ BacktestStats statsOf(List<Trade> tr) {
     profitFactor: gl > 0 ? _round(gp / gl, 2) : 99.0,
     maxDdR: _round(dd, 2),
     totalR: _round(sum, 2),
+    tStat: _round(tStat, 2),
   );
 }

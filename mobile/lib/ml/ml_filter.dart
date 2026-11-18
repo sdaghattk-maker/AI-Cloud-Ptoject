@@ -56,18 +56,22 @@ class MlModel {
   bool get approved => report.approved;
 
   Map<String, dynamic> toJson() => {
+        'v': 2,
         'model': model.toJson(),
         'threshold': threshold,
         'report': report.toJson(),
         'trainedAtMs': trainedAtMs,
       };
 
-  factory MlModel.fromJson(Map<String, dynamic> j) => MlModel(
+  factory MlModel.fromJson(Map<String, dynamic> j) {
+    if (j['v'] != 2) throw const FormatException('old ML model version');
+    return MlModel(
         LogisticModel.fromJson(j['model'] as Map<String, dynamic>),
         (j['threshold'] as num).toDouble(),
         MlReport.fromJson(j['report'] as Map<String, dynamic>),
         (j['trainedAtMs'] as num).toInt(),
       );
+  }
 }
 
 double _mean(List<double> v) =>

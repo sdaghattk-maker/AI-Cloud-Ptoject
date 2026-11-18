@@ -23,13 +23,14 @@ const stateSystemPrompt =
 String buildPrompt(Signal s) {
   final b = s.backtest;
   final ctx = s.context.entries.map((e) => '${e.key}=${e.value}').join(', ');
-  return 'نماد: ${s.symbol} | تایم‌فریم: ${s.timeframe} | جهت: ${s.side}\n'
+  return 'نماد: ${s.symbol} | تایم‌فریم: ${s.timeframe} | جهت: ${s.side} | '
+      'استراتژی: ${s.strategy.isEmpty ? 'نامشخص' : s.strategy}\n'
       'قیمت ورود: ${fmt(s.entry)} | حد ضرر: ${fmt(s.sl)} | هدف اول: ${fmt(s.tp1)} | '
       'هدف دوم: ${fmt(s.tp2)}\n'
       'نسبت ریسک به ریوارد تا هدف دوم: 1:${s.rr2.toStringAsFixed(1)} | '
       'فاصله حد ضرر: ${s.riskPct.toStringAsFixed(2)}٪ | امتیاز: ${s.score.toStringAsFixed(0)}/100\n'
       'بک‌تست خارج از نمونه: ${b.trades} معامله، وین‌ریت ${b.winRate}٪، میانگین ${b.expectancyR}R، '
-      'ProfitFactor ${b.profitFactor}، بیشینه افت ${b.maxDdR}R\n'
+      'ProfitFactor ${b.profitFactor}، بیشینه افت ${b.maxDdR}R، معناداری t=${b.tStat}\n'
       'فیلتر ML: ${s.mlStatus.isEmpty ? 'نامشخص' : s.mlStatus}\n'
       'اندیکاتورها در لحظه سیگنال: ${ctx.isEmpty ? 'نامشخص' : ctx}';
 }
@@ -46,11 +47,13 @@ String buildStatePrompt(AnalyzeResult r) {
   return 'نماد: ${r.symbol} | تایم‌فریم: ${r.timeframe} | سیگنال فعال: ندارد\n'
       'دلیل: $reason\n'
       'بک‌تست خارج از نمونه: ${b.trades} معامله، وین‌ریت ${b.winRate}٪، میانگین ${b.expectancyR}R، '
-      'ProfitFactor ${b.profitFactor}، بیشینه افت ${b.maxDdR}R\n'
+      'ProfitFactor ${b.profitFactor}، بیشینه افت ${b.maxDdR}R، معناداری t=${b.tStat}\n'
       'اندیکاتورها در آخرین کندل بسته‌شده: ${ctx.isEmpty ? 'نامشخص' : ctx}\n'
-      'قواعد استراتژی (برای توضیح استفاده کن، قاعده جدید نساز): لانگ وقتی EMA50 بالای EMA200 و '
-      'قیمت بالای EMA50 باشد، ADX از حد کمینه بیشتر باشد، حجم کافی باشد، RSI چند کندل اخیر زیر ۴۸ رفته '
-      'و دوباره از ۵۰ بالا بیاید و هیستوگرام MACD رو به رشد باشد. شورت دقیقاً برعکس.';
+      'استراتژی‌های بررسی‌شده (فقط برای توضیح؛ قاعده جدید نساز): ۱) روند + پولبک: همسو با روند، RSI بعد از '
+      'افت دوباره از ۵۰ بالا بیاید. ۲) شکست کانال: قیمت از بالاترین/پایین‌ترین قیمت چند کندل اخیر '
+      'در جهت روند عبور کند. ۳) بازگشت به میانگین در بازار رنج: قیمت بعد از خروج از باند بولینگر به '
+      'داخل برگردد. در هر کدام سیگنال فقط وقتی داده می‌شود که بک‌تست خارج از نمونه معنادار باشد '
+      'و هزینه کارمزد از ۲۵٪ ریسک بیشتر نشود.';
 }
 
 class AiAnswer {

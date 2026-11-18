@@ -34,6 +34,9 @@ class StatsCard extends StatelessWidget {
             cell('بیشینه افت', '${stats.maxDdR}R'),
             cell('مجموع R', '${stats.totalR}'),
           ]),
+          const SizedBox(height: 10),
+          Text('معناداری آماری (t): ${stats.tStat}  —  بالای ۱.۵ یعنی کمتر شانسی است',
+              style: const TextStyle(fontSize: 11)),
         ]),
       ),
     );
