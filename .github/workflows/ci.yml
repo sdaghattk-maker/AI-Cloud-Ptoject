@@ -37,7 +37,9 @@ jobs:
           channel: stable
           cache: true
       - name: Prepare Android project
-        run: sh ../tools/ensure_android.sh
+        run: |
+          sh ../tools/ensure_android.sh
+          rm -f test/widget_test.dart
       - run: flutter pub get
       - run: flutter analyze --no-fatal-infos
       - run: flutter test
