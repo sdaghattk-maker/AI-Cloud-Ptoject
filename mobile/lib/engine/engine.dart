@@ -46,7 +46,7 @@ class Engine {
     final status = model.approved
         ? 'تأیید ML (احتمال موفقیت $pct٪، آستانه $thrPct٪).'
         : 'ML فقط اطلاعاتی است و در بک‌تست برتری معنادار نشان نداده (احتمال $pct٪).';
-    final u = sig.copyWith(mlProb: prob, mlStatus: status);
+    final u = sig.copyWith(mlProb: prob, mlStatus: status, mlApproved: model.approved);
     return build(u.copyWith(explanation: explanationFor(u)), '');
   }
 

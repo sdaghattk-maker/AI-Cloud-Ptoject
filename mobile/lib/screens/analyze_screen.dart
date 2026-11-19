@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import '../models/signal.dart';
 import '../services/api.dart';
 import '../services/llm.dart';
+import '../engine/decision.dart';
 import '../widgets/ai_card.dart';
+import '../widgets/decision_card.dart';
 import '../widgets/signal_body.dart';
 import '../widgets/stats_card.dart';
 
@@ -87,24 +89,11 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
   Widget _resultView(AnalyzeResult r) {
     if (r.signal != null) return SignalBody(signal: r.signal!);
     return Column(children: [
-      Card(
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Text(
-            r.note.isNotEmpty
-                ? r.note
-                : r.edgeOk
-                ? 'در حال حاضر شرایط ورود برای ${r.symbol} (${r.timeframe}) فعال نیست. '
-                    'صبر کنید تا الگو کامل شود.'
-                : 'برای ${r.symbol} در ${r.timeframe} هیچ‌کدام از ۳ استراتژی (روند + پولبک، شکست '
-                    'کانال، بازگشت به میانگین) لبه آماری قابل‌اعتماد در بک‌تست نشان ندادند؛ '
-                    'بنابراین سیگنالی صادر نمی‌شود.',
-          ),
-        ),
-      ),
+      DecisionCard(decision: decisionForResult(r)),
       StatsCard(stats: r.backtest),
       AiAnalysisCard(
-        title: 'توضیح AI درباره وضعیت فعلی',
+        title: 'نظر AI (خلاصه)',
+        lastLabel: 'چه چیزی را منتظر باشیم؟',
         cacheKey: '${r.symbol}_${r.timeframe}_${r.context['lastPrice']}',
         system: stateSystemPrompt,
         prompt: buildStatePrompt(r),

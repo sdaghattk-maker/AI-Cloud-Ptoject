@@ -1,40 +1,10 @@
 import 'package:flutter/material.dart';
-import '../models/signal.dart';
+import '../services/ai_brief.dart';
 import '../services/errors.dart';
 import '../services/llm.dart';
 import '../services/settings.dart';
 
-/// کارت ML: احتمال موفقیت و وضعیت تأیید فیلتر
-class MlCard extends StatelessWidget {
-  const MlCard({super.key, required this.signal});
-  final Signal signal;
-
-  @override
-  Widget build(BuildContext context) {
-    final s = signal;
-    if (s.mlStatus.isEmpty) return const SizedBox.shrink();
-    final p = s.mlProb;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Text('فیلتر یادگیری ماشین',
-              style: TextStyle(fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          if (p != null) ...[
-            LinearProgressIndicator(value: p.clamp(0.0, 1.0)),
-            const SizedBox(height: 6),
-            Text('احتمال موفقیت (تخمین مدل): ${(p * 100).round()}٪'),
-            const SizedBox(height: 6),
-          ],
-          Text(s.mlStatus, style: const TextStyle(fontSize: 12)),
-        ]),
-      ),
-    );
-  }
-}
-
-/// کارت تحلیل هوشمند: هم برای سیگنال و هم برای حالت «بدون سیگنال» استفاده می‌شود.
+/// نظر کوتاه AI: «چرا؟»، «ریسک‌ها» و یک جمله پایانی. تصمیم اصلی را کارت تصمیم می‌دهد.
 /// بسته به تنظیمات، پاسخ یک AI یا مقایسه پاسخ دو AI را نشان می‌دهد.
 class AiAnalysisCard extends StatefulWidget {
   const AiAnalysisCard({
@@ -42,9 +12,10 @@ class AiAnalysisCard extends StatefulWidget {
     required this.cacheKey,
     required this.system,
     required this.prompt,
-    this.title = 'تحلیل هوشمند (AI)',
+    this.title = 'نظر AI (خلاصه)',
+    this.lastLabel = 'شرط ابطال',
   });
-  final String cacheKey, system, prompt, title;
+  final String cacheKey, system, prompt, title, lastLabel;
 
   @override
   State<AiAnalysisCard> createState() => _AiAnalysisCardState();
@@ -82,15 +53,15 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
           const SizedBox(height: 8),
           if (!Settings.llmReady)
             const Text(
-              'برای فعال‌سازی: تب «تنظیمات» ← «هوش مصنوعی»، آدرس و مدل و کلید را وارد و ذخیره کنید. '
-              'سپس به همین صفحه برگردید.',
+              'اختیاری: برای نظر AI، در تب «تنظیمات» ← «هوش مصنوعی» یک کلید وارد کنید. '
+              'تصمیم اپ بالای این صفحه بدون AI هم کار می‌کند.',
               style: TextStyle(fontSize: 12),
             )
           else ...[
             FilledButton.icon(
               onPressed: _loading ? null : _run,
               icon: const Icon(Icons.auto_awesome),
-              label: Text(_answers == null ? 'تحلیل هوشمند' : 'تحلیل دوباره'),
+              label: Text(_answers == null ? 'نظر AI' : 'دوباره'),
             ),
             const SizedBox(height: 10),
             if (_loading) const LinearProgressIndicator(),
@@ -99,7 +70,7 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
               for (final a in _answers!) _answerView(a),
             if (_answers != null)
               const Padding(
-                padding: EdgeInsets.only(top: 8),
+                padding: EdgeInsets.only(top: 6),
                 child: Text(
                   'AI فقط داده‌های محاسبه‌شده را توضیح می‌دهد و ممکن است اشتباه کند.',
                   style: TextStyle(fontSize: 11),
@@ -113,14 +84,50 @@ class _AiAnalysisCardState extends State<AiAnalysisCard> {
 
   Widget _answerView(AiAnswer a) {
     return Padding(
-      padding: const EdgeInsets.only(top: 6, bottom: 6),
+      padding: const EdgeInsets.only(top: 6),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('${a.label} · ${a.model}',
             textDirection: TextDirection.ltr,
             style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
         const SizedBox(height: 4),
-        a.ok ? SelectableText(a.text) : Text('خطا: ${a.text}'),
+        if (!a.ok)
+          Text('خطا: ${a.text}')
+        else
+          _brief(a.text),
         const Divider(),
+      ]),
+    );
+  }
+
+  Widget _brief(String text) {
+    final b = parseAiBrief(text);
+    if (b == null) {
+      // اگر مدل JSON نداد، متن را کوتاه نشان بده
+      return SelectableText(text.length > 500 ? '${text.substring(0, 500)}…' : text,
+          style: const TextStyle(fontSize: 13));
+    }
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      if (b.reasons.isNotEmpty) _section('چرا؟', b.reasons, Icons.check_circle_outline),
+      if (b.risks.isNotEmpty) _section('ریسک‌ها', b.risks, Icons.warning_amber_rounded),
+      if (b.invalidation.isNotEmpty)
+        _section(widget.lastLabel, [b.invalidation], Icons.flag_outlined),
+    ]);
+  }
+
+  Widget _section(String title, List<String> items, IconData icon) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+        for (final it in items)
+          Padding(
+            padding: const EdgeInsets.only(top: 3),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Icon(icon, size: 16),
+              const SizedBox(width: 6),
+              Expanded(child: SelectableText(it, style: const TextStyle(fontSize: 13))),
+            ]),
+          ),
       ]),
     );
   }

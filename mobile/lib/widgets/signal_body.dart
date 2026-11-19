@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../engine/decision.dart';
 import '../models/signal.dart';
 import '../services/llm.dart';
 import 'ai_card.dart';
+import 'decision_card.dart';
 import 'levels_chart.dart';
 import 'risk_calculator.dart';
 import 'stats_card.dart';
@@ -43,12 +45,8 @@ class SignalBody extends StatelessWidget {
         Text('${s.symbol} · ${s.timeframe}',
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
       ]),
-      if (s.strategy.isNotEmpty)
-        Padding(
-          padding: const EdgeInsets.only(top: 6),
-          child: Text('استراتژی: ${s.strategy}', style: const TextStyle(fontSize: 12)),
-        ),
       const SizedBox(height: 8),
+      DecisionCard(decision: decisionForSignal(s)),
       LevelsChart(signal: s),
       Card(
         child: Column(children: [
@@ -81,19 +79,11 @@ class SignalBody extends StatelessWidget {
         ),
       ),
       StatsCard(stats: s.backtest),
-      MlCard(signal: s),
       AiAnalysisCard(
         cacheKey: '${s.symbol}_${s.timeframe}_${s.time}',
         system: signalSystemPrompt,
         prompt: buildPrompt(s),
       ),
-      if (s.explanation.isNotEmpty)
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Text(s.explanation),
-          ),
-        ),
       RiskCalculator(signal: s),
       const Padding(
         padding: EdgeInsets.all(8),

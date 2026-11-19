@@ -37,6 +37,7 @@ class Signal {
   final String symbol, timeframe, side, time, explanation, mlStatus, strategy;
   final double score, entry, sl, tp1, tp2, riskPct;
   final double? mlProb; // احتمال موفقیت از مدل ML (در صورت وجود)
+  final bool mlApproved; // آیا مدل ML در بک‌تست برتری معنادار نشان داده است
   final Map<String, double> context; // عکس لحظه‌ای اندیکاتورها برای توضیح AI
   final BacktestStats backtest;
 
@@ -55,11 +56,14 @@ class Signal {
     required this.backtest,
     this.mlProb,
     this.mlStatus = '',
+    this.mlApproved = false,
     this.strategy = '',
     this.context = const {},
   });
 
-  Signal copyWith({String? explanation, double? mlProb, String? mlStatus}) => Signal(
+  Signal copyWith(
+          {String? explanation, double? mlProb, String? mlStatus, bool? mlApproved}) =>
+      Signal(
         symbol: symbol,
         timeframe: timeframe,
         side: side,
@@ -74,6 +78,7 @@ class Signal {
         backtest: backtest,
         mlProb: mlProb ?? this.mlProb,
         mlStatus: mlStatus ?? this.mlStatus,
+        mlApproved: mlApproved ?? this.mlApproved,
         strategy: strategy,
         context: context,
       );
