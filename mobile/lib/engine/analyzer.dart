@@ -72,7 +72,8 @@ class SeriesResult {
   final AnalyzeResult result;
   final List<TradeSample> samples; // معاملات تاریخی با ویژگی‌هایشان
   final List<double>? liveX; // ویژگی‌های سیگنال فعلی (اگر باشد)
-  const SeriesResult(this.result, this.samples, this.liveX);
+  final Params? params; // استراتژی و پارامترهای منتخب (برای نمایش روی چارت)
+  const SeriesResult(this.result, this.samples, this.liveX, [this.params]);
 }
 
 double _r2(double v) => v.isNaN || v.isInfinite ? 0 : (v * 100).round() / 100;
@@ -147,7 +148,8 @@ SeriesResult analyzeSeries(String symbol, String tf, Candles c) {
               note: note,
               context: ctx),
           samples,
-          x);
+          x,
+          finalP);
 
   if (finalP == null || n < 250) return out(false, null, null);
 

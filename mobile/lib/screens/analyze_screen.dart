@@ -1,12 +1,8 @@
 import 'package:flutter/material.dart';
 import '../models/signal.dart';
 import '../services/api.dart';
-import '../services/llm.dart';
-import '../engine/decision.dart';
-import '../widgets/ai_card.dart';
-import '../widgets/decision_card.dart';
-import '../widgets/signal_body.dart';
-import '../widgets/stats_card.dart';
+import '../widgets/result_view.dart';
+import 'chart_screen.dart';
 
 class AnalyzeScreen extends StatefulWidget {
   const AnalyzeScreen({super.key});
@@ -81,27 +77,18 @@ class _AnalyzeScreenState extends State<AnalyzeScreen> {
         else if (_error != null)
           Text(_error!, textAlign: TextAlign.center)
         else if (_result != null)
-          _resultView(_result!),
+          ...[
+          OutlinedButton.icon(
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) =>
+                    ChartScreen(symbol: _result!.symbol, timeframe: _result!.timeframe))),
+            icon: const Icon(Icons.show_chart),
+            label: const Text('نمایش روی چارت'),
+          ),
+          const SizedBox(height: 8),
+          ResultView(result: _result!),
+        ],
       ]),
     );
-  }
-
-  Widget _resultView(AnalyzeResult r) {
-    if (r.signal != null) return SignalBody(signal: r.signal!);
-    return Column(children: [
-      DecisionCard(decision: decisionForResult(r)),
-      StatsCard(stats: r.backtest),
-      AiAnalysisCard(
-        title: 'نظر AI (خلاصه)',
-        lastLabel: 'چه چیزی را منتظر باشیم؟',
-        cacheKey: '${r.symbol}_${r.timeframe}_${r.context['lastPrice']}',
-        system: stateSystemPrompt,
-        prompt: buildStatePrompt(r),
-      ),
-      const Padding(
-        padding: EdgeInsets.all(8),
-        child: Text(disclaimer, style: TextStyle(fontSize: 11)),
-      ),
-    ]);
   }
 }

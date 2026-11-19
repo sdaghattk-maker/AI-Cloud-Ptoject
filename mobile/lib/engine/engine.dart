@@ -1,9 +1,11 @@
 import '../ml/ml_filter.dart';
+import '../paper/paper_store.dart';
 import '../models/signal.dart';
 import '../services/errors.dart';
 import '../services/settings.dart';
 import 'analyzer.dart';
 import 'binance.dart';
+import 'chart_data.dart';
 
 const defaultTimeframes = ['15m', '1h', '4h', '1d'];
 
@@ -55,7 +57,29 @@ class Engine {
     final candles = await Binance.klines(sym, tf);
     final series = analyzeSeries(sym, tf, candles);
     final model = await MlStore.load(tf);
-    return applyMl(series, model);
+    final applied = applyMl(series, model);
+    await _record(applied.signal);
+    return applied;
+  }
+
+  /// ثبت سیگنال برای Paper Trading؛ هیچ‌وقت نباید تحلیل را خراب کند.
+  static Future<void> _record(Signal? s) async {
+    if (s == null) return;
+    try {
+      await PaperStore.record(s);
+    } catch (_) {}
+  }
+
+  /// داده کامل چارت: کندل‌ها، اندیکاتورها، سطوح، علامت معاملات تاریخی و حکم تصمیم
+  static Future<ChartData> chart(String symbol, String tf) async {
+    final sym = symbol.toUpperCase();
+    final candles = await Binance.klines(sym, tf);
+    await Future<void>.delayed(Duration.zero); // اجازه به UI برای نمایش «در حال بارگذاری»
+    final series = analyzeSeries(sym, tf, candles);
+    final model = await MlStore.load(tf);
+    final applied = applyMl(series, model);
+    await _record(applied.signal);
+    return buildChartData(sym, tf, candles, series, applied);
   }
 
   /// اسکن چند نماد و چند تایم‌فریم. بعد از دریافت همه داده‌ها، برای هر تایم‌فریم
@@ -115,6 +139,9 @@ class Engine {
     for (final e in all) {
       final r = applyMl(e.value, models[e.key]);
       if (r.signal != null) out.add(r.signal!);
+    }
+    for (final sg in out) {
+      await _record(sg);
     }
     out.sort((a, b) {
       final c = b.backtest.expectancyR.compareTo(a.backtest.expectancyR);
