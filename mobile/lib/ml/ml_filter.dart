@@ -8,6 +8,7 @@ class TradeSample {
   final List<double> x;
   final double r; // نتیجه خالص بر حسب R
   final int side, strategy; // +1/-1 و ۰/۱/۲ (برای گزارش پژوهشی)
+  final double costR, riskPct; // هزینه (R) و اندازه حد ضرر (٪) برای گزارش پژوهشی
   const TradeSample({
     required this.timeMs,
     required this.endMs,
@@ -15,6 +16,8 @@ class TradeSample {
     required this.r,
     this.side = 0,
     this.strategy = 0,
+    this.costR = 0,
+    this.riskPct = 0,
   });
 }
 

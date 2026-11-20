@@ -70,6 +70,29 @@ String _date(int ms) {
   return '${d.year}-${two(d.month)}-${two(d.day)}';
 }
 
+/// یک مشاهده: نتیجه خالص، هزینه (R) و اندازه حد ضرر (٪)
+class _Obs {
+  final double r, cost, stop;
+  const _Obs(this.r, this.cost, this.stop);
+}
+
+List<_Obs> _fromSamples(Iterable<TradeSample> s) =>
+    [for (final x in s) _Obs(x.r, x.costR, x.riskPct)];
+
+List<_Obs> _fromOos(Iterable<OosTrade> s) =>
+    [for (final x in s) _Obs(x.r, x.costR, x.riskPct)];
+
+/// خام = قبل از کارمزد و لغزش (همان معاملات و همان خروج‌ها)؛ خالص = بعد از آن‌ها
+String _rawLine(List<_Obs> o) {
+  if (o.isEmpty) return 'n=0';
+  final net = _agg([for (final x in o) x.r]);
+  final gross = _agg([for (final x in o) x.r + x.cost]);
+  final cost = o.map((x) => x.cost).reduce((a, c) => a + c) / o.length;
+  final stop = o.map((x) => x.stop).reduce((a, c) => a + c) / o.length;
+  return 'n=${net.n} net=${_sg(net.mean, 3)} gross=${_sg(gross.mean, 3)} '
+      '(tGross=${_sg(gross.t, 2)}) cost=${_f(cost, 3)}R stop=${_f(stop, 2)}%';
+}
+
 String _aggLine(_Agg a) => 'n=${a.n} avgR=${_sg(a.mean, 3)} win=${_f(a.winPct, 1)}% '
     'PF=${_f(a.pf, 2)} t=${_sg(a.t, 2)}';
 
@@ -167,6 +190,45 @@ String buildResearchReport(List<SeriesReport> rows,
     final avg = g.map((r) => r.changePct).reduce((a, c) => a + c) / g.length;
     b.writeln('  $tf: avg change=${_sg(avg, 1)}% over ~'
         '${(g.map((r) => r.lastMs - r.firstMs).reduce((a, c) => a + c) / g.length / 86400000).round()} days');
+  }
+
+  // ---------- [F] لبه خام ----------
+  b.writeln('\n[F] RAW EDGE (gross = before fees+slippage, same trades and exits; net = after; '
+      'cost = avg fees+slippage in R; stop = avg stop distance, % of price)');
+  b.writeln('reading: gross~0 => no raw edge | gross>0 but net<=0 => costs are the problem');
+  b.writeln('pooled OOS: ${_rawLine(_fromOos(allOos))}');
+  for (var k = 0; k < 3; k++) {
+    b.writeln('  OOS ${_fam[k].padRight(9)} ${_rawLine(_fromOos(allOos.where((o) => o.strategy == k)))}');
+  }
+  b.writeln('fixed-param, no selection:');
+  for (var k = 0; k < 3; k++) {
+    for (final tf in _tfs) {
+      final obs = _fromSamples([
+        for (final r in rows)
+          if (r.timeframe == tf)
+            for (final x in r.samples)
+              if (x.strategy == k) x
+      ]);
+      if (obs.isEmpty) continue;
+      b.writeln('  ${_fam[k].padRight(9)} ${tf.padRight(3)} ${_rawLine(obs)}');
+    }
+  }
+  for (final sym in const ['BTCUSDT', 'ETHUSDT']) {
+    final sr = rows.where((r) => r.symbol == sym).toList();
+    if (sr.isEmpty) continue;
+    b.writeln('$sym only:');
+    for (var k = 0; k < 3; k++) {
+      final obs = _fromSamples([
+        for (final r in sr)
+          for (final x in r.samples)
+            if (x.strategy == k) x
+      ]);
+      b.writeln('  fixed ${_fam[k].padRight(9)} ${_rawLine(obs)}');
+    }
+    for (final r in sr) {
+      b.writeln('  ${r.timeframe.padRight(3)} fixed-all ${_rawLine(_fromSamples(r.samples))}'
+          ' | OOS ${_rawLine(_fromOos(r.oos))}');
+    }
   }
 
   if (failures.isNotEmpty) {

@@ -16,9 +16,12 @@ double costInR(double entry, double risk) =>
     risk > 0 ? (fee * 2 + slippage) * entry / risk : double.infinity;
 
 class Trade {
-  final double r;
+  final double r; // نتیجه خالص (بعد از کارمزد و لغزش) بر حسب R
   final int bar, side, bars;
-  const Trade(this.r, this.bar, this.side, this.bars);
+  final double costR; // هزینه کارمزد + لغزش بر حسب R؛ نتیجه خام = r + costR
+  final double riskPct; // فاصله حد ضرر از ورود، درصد قیمت
+  const Trade(this.r, this.bar, this.side, this.bars,
+      [this.costR = 0, this.riskPct = 0]);
 }
 
 /// بک‌تست واقع‌گرایانه: ورود در open کندل بعد، اول SL (محافظه‌کارانه)،
@@ -75,7 +78,8 @@ List<Trade> runBacktest(
       k = kk;
     }
     final fees = fee * 2 * e;
-    trades.add(Trade((pnl - fees) / risk, i, s, k - i));
+    trades.add(Trade((pnl - fees) / risk, i, s, k - i,
+        (fees + slippage * o[k0]) / risk, risk / e * 100));
     i = k + 1;
   }
   return trades;

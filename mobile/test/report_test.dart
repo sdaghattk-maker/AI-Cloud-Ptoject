@@ -157,4 +157,40 @@ void main() {
     expect(rep, isNot(contains('NaN')));
     expect(rep, isNot(contains('Infinity')));
   });
+
+  test('raw-edge section separates gross from net and shows costs and stops', () {
+    final rows2 = [
+      row('BTCUSDT', '4h', 'breakout', false, [
+        for (var i = 0; i < 10; i++) const OosTrade(-0.1, 1, 0.2, 1.0),
+      ], [
+        for (var i = 0; i < 10; i++)
+          TradeSample(
+              timeMs: 0,
+              endMs: 0,
+              x: const [0.0],
+              r: -0.1,
+              side: 1,
+              strategy: 1,
+              costR: 0.2,
+              riskPct: 1.0),
+      ]),
+    ];
+    final r = buildResearchReport(rows2);
+    expect(r, contains('[F]'));
+    expect(r, contains('net=-0.100'));
+    expect(r, contains('gross=+0.100'));
+    expect(r, contains('cost=0.200R'));
+    expect(r, contains('stop=1.00%'));
+    expect(r, contains('BTCUSDT only:'));
+    expect(r, isNot(contains('ETHUSDT only:')));
+    expect(r, contains('reading: gross~0'));
+  });
+
+  test('raw edge has an empty-safe form and old data without costs stays sane', () {
+    final r = buildResearchReport(rows); // نمونه‌های بدون هزینه (۰)
+    expect(r, contains('[F]'));
+    expect(r, contains('n=0')); // خانواده بدون معامله
+    expect(r, contains('cost=0.000R')); // هزینه ثبت‌نشده = ۰، خام = خالص
+    expect(r, isNot(contains('NaN')));
+  });
 }

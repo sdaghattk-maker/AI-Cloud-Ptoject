@@ -138,4 +138,19 @@ void main() {
       expect(costInR(s.entry, (s.entry - s.sl).abs()), lessThanOrEqualTo(maxCostR));
     }
   });
+
+  test('trades carry cost in R and stop size consistent with the cost model', () {
+    final c = synthetic(5000, 7);
+    final d = computeIndicators(c);
+    const p = Params(15, 1.5, 2.0);
+    final tr = runBacktest(d, buildSignals(d, 15), p, 200, 5000);
+    expect(tr, isNotEmpty);
+    for (final t in tr) {
+      expect(t.costR, greaterThan(0));
+      expect(t.costR, lessThanOrEqualTo(maxCostR + 0.01));
+      expect(t.riskPct, greaterThan(0));
+      // هزینه (R) × اندازه حد ضرر (کسر قیمت) = هزینه رفت‌وبرگشت + لغزش
+      expect(t.costR * t.riskPct / 100, closeTo(fee * 2 + slippage, 1e-5));
+    }
+  });
 }

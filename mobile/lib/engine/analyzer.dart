@@ -69,9 +69,10 @@ String explanationFor(Signal s) {
 
 /// یک معامله خارج از نمونه به‌همراه خانواده استراتژی‌ای که Walk-Forward برای آن بازه انتخاب کرده بود
 class OosTrade {
-  final double r;
+  final double r; // خالص
   final int strategy;
-  const OosTrade(this.r, this.strategy);
+  final double costR, riskPct; // برای سنجش لبه خام: خام = r + costR
+  const OosTrade(this.r, this.strategy, [this.costR = 0, this.riskPct = 0]);
 }
 
 /// نتیجه تحلیل یک سری + داده‌های لازم برای آموزش/اعمال فیلتر ML
@@ -117,6 +118,8 @@ List<TradeSample> _collectSamples(Indicators d, Candles c, Map<String, Signals> 
         r: t.r,
         side: t.side,
         strategy: ref.strategy,
+        costR: t.costR,
+        riskPct: t.riskPct,
       ));
     }
   }
@@ -142,7 +145,7 @@ SeriesResult analyzeSeries(String symbol, String tf, Candles c) {
     if (p != null) {
       final tr = runBacktest(d, bank[p.key]!, p, start + train, start + train + test);
       oosTrades.addAll(tr);
-      oosList.addAll([for (final t in tr) OosTrade(t.r, p.strategy)]);
+      oosList.addAll([for (final t in tr) OosTrade(t.r, p.strategy, t.costR, t.riskPct)]);
     }
     start += test;
   }
