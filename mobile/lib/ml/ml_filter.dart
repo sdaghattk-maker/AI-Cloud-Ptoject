@@ -7,8 +7,15 @@ class TradeSample {
   final int timeMs, endMs; // زمان سیگنال و زمان بسته‌شدن معامله
   final List<double> x;
   final double r; // نتیجه خالص بر حسب R
-  const TradeSample(
-      {required this.timeMs, required this.endMs, required this.x, required this.r});
+  final int side, strategy; // +1/-1 و ۰/۱/۲ (برای گزارش پژوهشی)
+  const TradeSample({
+    required this.timeMs,
+    required this.endMs,
+    required this.x,
+    required this.r,
+    this.side = 0,
+    this.strategy = 0,
+  });
 }
 
 class MlReport {

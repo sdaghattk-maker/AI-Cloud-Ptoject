@@ -1,5 +1,6 @@
 import '../ml/ml_filter.dart';
 import '../paper/paper_store.dart';
+import '../research/report.dart';
 import '../models/signal.dart';
 import '../services/errors.dart';
 import '../services/settings.dart';
@@ -8,6 +9,12 @@ import 'binance.dart';
 import 'chart_data.dart';
 
 const defaultTimeframes = ['15m', '1h', '4h', '1d'];
+
+class ResearchData {
+  final List<SeriesReport> rows;
+  final List<String> failures;
+  const ResearchData(this.rows, this.failures);
+}
 
 class Engine {
   /// اعمال فیلتر ML روی نتیجه یک سری:
@@ -148,5 +155,59 @@ class Engine {
       return c != 0 ? c : b.score.compareTo(a.score);
     });
     return out;
+  }
+
+  /// تحلیل همه نمادها × تایم‌فریم‌ها فقط برای پژوهش (چیزی ثبت نمی‌کند و ML را درگیر نمی‌کند).
+  static Future<ResearchData> research({
+    List<String>? symbols,
+    List<String>? timeframes,
+    void Function(int done, int total)? onProgress,
+  }) async {
+    final syms = symbols ?? Settings.symbols;
+    final tfs = timeframes ?? defaultTimeframes;
+    final total = syms.length * tfs.length;
+    var done = 0;
+    final rows = <SeriesReport>[];
+    final failures = <String>[];
+    onProgress?.call(0, total);
+
+    for (final s in syms) {
+      final fetched = await Future.wait(tfs.map<Future<Candles?>>((tf) async {
+        try {
+          return await Binance.klines(s, tf);
+        } catch (e) {
+          failures.add('$s $tf: $e');
+          return null;
+        }
+      }));
+      for (var k = 0; k < tfs.length; k++) {
+        final c = fetched[k];
+        if (c != null && c.length >= 2) {
+          try {
+            final series = analyzeSeries(s, tfs[k], c);
+            final p = series.params;
+            rows.add(SeriesReport(
+              symbol: s,
+              timeframe: tfs[k],
+              strategyName: p == null ? '' : famName(p.strategy),
+              candles: c.length,
+              firstMs: c.times.first,
+              lastMs: c.times.last,
+              changePct: (c.close.last / c.close.first - 1) * 100,
+              result: series.result,
+              oos: series.oos,
+              samples: series.samples,
+            ));
+          } catch (e) {
+            failures.add('$s ${tfs[k]}: analysis error $e');
+          }
+        }
+        done++;
+        onProgress?.call(done, total);
+        await Future<void>.delayed(Duration.zero); // اجازه به UI برای رفرش
+      }
+    }
+    if (rows.isEmpty && failures.isNotEmpty) throw ApiException(failures.first);
+    return ResearchData(rows, failures);
   }
 }

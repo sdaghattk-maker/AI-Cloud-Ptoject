@@ -67,13 +67,22 @@ String explanationFor(Signal s) {
       'این تحلیل توصیه مالی نیست؛ ریسک هر معامله را کوچک نگه دارید.';
 }
 
+/// یک معامله خارج از نمونه به‌همراه خانواده استراتژی‌ای که Walk-Forward برای آن بازه انتخاب کرده بود
+class OosTrade {
+  final double r;
+  final int strategy;
+  const OosTrade(this.r, this.strategy);
+}
+
 /// نتیجه تحلیل یک سری + داده‌های لازم برای آموزش/اعمال فیلتر ML
 class SeriesResult {
   final AnalyzeResult result;
   final List<TradeSample> samples; // معاملات تاریخی با ویژگی‌هایشان
   final List<double>? liveX; // ویژگی‌های سیگنال فعلی (اگر باشد)
   final Params? params; // استراتژی و پارامترهای منتخب (برای نمایش روی چارت)
-  const SeriesResult(this.result, this.samples, this.liveX, [this.params]);
+  final List<OosTrade> oos; // همه معاملات خارج از نمونه Walk-Forward
+  const SeriesResult(this.result, this.samples, this.liveX,
+      [this.params, this.oos = const <OosTrade>[]]);
 }
 
 double _r2(double v) => v.isNaN || v.isInfinite ? 0 : (v * 100).round() / 100;
@@ -106,6 +115,8 @@ List<TradeSample> _collectSamples(Indicators d, Candles c, Map<String, Signals> 
         endMs: c.times[math.min(t.bar + t.bars, n - 1)],
         x: featuresAt(d, t.bar, t.side, strategy: ref.strategy),
         r: t.r,
+        side: t.side,
+        strategy: ref.strategy,
       ));
     }
   }
@@ -124,12 +135,14 @@ SeriesResult analyzeSeries(String symbol, String tf, Candles c) {
   final ctx = n == 0 ? <String, double>{} : _contextAt(d, c, n - 1);
 
   final oosTrades = <Trade>[];
+  final oosList = <OosTrade>[];
   var start = 200;
   while (start + train + test <= n) {
     final p = _optimize(d, bank, start, start + train);
     if (p != null) {
-      oosTrades.addAll(
-          runBacktest(d, bank[p.key]!, p, start + train, start + train + test));
+      final tr = runBacktest(d, bank[p.key]!, p, start + train, start + train + test);
+      oosTrades.addAll(tr);
+      oosList.addAll([for (final t in tr) OosTrade(t.r, p.strategy)]);
     }
     start += test;
   }
@@ -149,7 +162,8 @@ SeriesResult analyzeSeries(String symbol, String tf, Candles c) {
               context: ctx),
           samples,
           x,
-          finalP);
+          finalP,
+          oosList);
 
   if (finalP == null || n < 250) return out(false, null, null);
 

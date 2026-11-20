@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../engine/engine.dart';
 import '../ml/ml_filter.dart';
 import '../widgets/ai_profile_editor.dart';
+import 'research_screen.dart';
 import '../services/settings.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -43,6 +44,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('تنظیمات')),
       body: ListView(padding: const EdgeInsets.all(16), children: [
+        // ---------------- گزارش پژوهشی ----------------
+        Card(
+          child: ListTile(
+            leading: const Icon(Icons.science_outlined),
+            title: const Text('گزارش پژوهشی'),
+            subtitle: const Text(
+                'تحلیل همه نمادها در یک متن فشرده برای کپی و بررسی آماری'),
+            trailing: const Icon(Icons.chevron_left),
+            onTap: () => Navigator.of(context)
+                .push(MaterialPageRoute(builder: (_) => const ResearchScreen())),
+          ),
+        ),
+        const SizedBox(height: 16),
+
         // ---------------- نمادها ----------------
         const Text('نمادهای اسکن (جفت‌ارز با USDT، جداشده با ویرگول)',
             style: TextStyle(fontWeight: FontWeight.w600)),
