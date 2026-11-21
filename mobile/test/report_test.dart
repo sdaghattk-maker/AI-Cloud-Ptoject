@@ -164,10 +164,10 @@ void main() {
         for (var i = 0; i < 10; i++) const OosTrade(-0.1, 1, 0.2, 1.0),
       ], [
         for (var i = 0; i < 10; i++)
-          TradeSample(
+          const TradeSample(
               timeMs: 0,
               endMs: 0,
-              x: const [0.0],
+              x: [0.0],
               r: -0.1,
               side: 1,
               strategy: 1,

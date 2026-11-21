@@ -180,7 +180,8 @@ PortfolioResult simulatePortfolio(List<DailyTrade> all,
   realize(1 << 62);
 
   final years = math.max(1e-9, (maxExit - trades.first.entryMs) / _yearMs);
-  final cagr = equity > 0 ? (math.pow(equity, 1 / years) - 1) * 100 : -100.0;
+  final double cagr =
+      equity > 0 ? (math.pow(equity, 1 / years).toDouble() - 1) * 100 : -100.0;
   return PortfolioResult(taken, skipped, equity, maxDd * 100, years, cagr);
 }
 

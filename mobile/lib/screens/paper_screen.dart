@@ -148,7 +148,8 @@ class _PaperScreenState extends State<PaperScreen> {
   }
 
   Widget _tile(PaperTrade t) {
-    final green = const Color(0xFF2E9E5B), red = const Color(0xFFD64545);
+    const green = Color(0xFF2E9E5B);
+    const red = Color(0xFFD64545);
     final closed = t.isClosed;
     final win = closed && t.resultR! > 0;
     final color = !closed ? Colors.amber : (win ? green : red);
