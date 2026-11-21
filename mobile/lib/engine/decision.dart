@@ -50,6 +50,12 @@ String strengthOf(BacktestStats b, {required bool mlApproved}) {
   return 'ضعیف';
 }
 
+/// ۱۵ دقیقه و ۱ ساعت: هزینه رفت‌وبرگشت در بک‌تست ۰.۱۶ تا ۰.۲۰R بود و هر لبه‌ای را می‌خورد
+bool _lowTf(String tf) => tf == '15m' || tf == '1h';
+
+CheckItem _tfCheck(String tf) => CheckItem(
+    'تایم‌فریم ۴ ساعته یا بالاتر (هزینه کمتر)', !_lowTf(tf), tf);
+
 Decision decisionForSignal(Signal s) {
   final b = s.backtest;
   final cost = costInR(s.entry, s.riskDistance);
@@ -72,6 +78,7 @@ Decision decisionForSignal(Signal s) {
       ..._statChecks(b),
       CheckItem('هزینه کارمزد قابل‌قبول (≤ ${(maxCostR * 100).round()}٪ ریسک)',
           cost <= maxCostR, '${(cost * 100).round()}٪ ریسک'),
+      _tfCheck(s.timeframe),
       const CheckItem('شرط ورود در کندل فعلی', true, 'برقرار'),
       ml,
     ],
@@ -84,6 +91,7 @@ Decision decisionForResult(AnalyzeResult r) {
 
   final checks = [
     ..._statChecks(r.backtest),
+    _tfCheck(r.timeframe),
     CheckItem('شرط ورود در کندل فعلی', false,
         r.note.isNotEmpty ? 'رد شد' : 'کامل نیست'),
   ];

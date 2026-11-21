@@ -1,5 +1,6 @@
 import '../ml/ml_filter.dart';
 import '../paper/paper_store.dart';
+import '../research/daily.dart';
 import '../research/report.dart';
 import '../models/signal.dart';
 import '../services/errors.dart';
@@ -8,12 +9,23 @@ import 'analyzer.dart';
 import 'binance.dart';
 import 'chart_data.dart';
 
-const defaultTimeframes = ['15m', '1h', '4h', '1d'];
+/// اسکن پیش‌فرض فقط ۴ ساعته و روزانه است: در گزارش پژوهشی، ۱۵ دقیقه و ۱ ساعت هزینه (۰.۱۶ تا ۰.۲۰R)
+/// را بیش از هر لبه‌ای می‌خورند و حتی خام هم لبه معناداری نداشتند.
+const defaultTimeframes = ['4h', '1d'];
+
+/// گزارش پژوهشی کامل همه تایم‌فریم‌ها را بررسی می‌کند.
+const allTimeframes = ['15m', '1h', '4h', '1d'];
 
 class ResearchData {
   final List<SeriesReport> rows;
   final List<String> failures;
   const ResearchData(this.rows, this.failures);
+}
+
+class DailyData {
+  final List<DailySeries> rows;
+  final List<String> failures;
+  const DailyData(this.rows, this.failures);
 }
 
 class Engine {
@@ -164,7 +176,7 @@ class Engine {
     void Function(int done, int total)? onProgress,
   }) async {
     final syms = symbols ?? Settings.symbols;
-    final tfs = timeframes ?? defaultTimeframes;
+    final tfs = timeframes ?? allTimeframes;
     final total = syms.length * tfs.length;
     var done = 0;
     final rows = <SeriesReport>[];
@@ -209,5 +221,33 @@ class Engine {
     }
     if (rows.isEmpty && failures.isNotEmpty) throw ApiException(failures.first);
     return ResearchData(rows, failures);
+  }
+
+  /// اعتبارسنجی متمرکز شکست کانال روی روزانه (پارامتر ثابت) برای همه نمادهای تنظیمات.
+  static Future<DailyData> dailyValidation({
+    void Function(int done, int total)? onProgress,
+  }) async {
+    final syms = Settings.symbols;
+    final rows = <DailySeries>[];
+    final failures = <String>[];
+    onProgress?.call(0, syms.length);
+    var done = 0;
+    for (final s in syms) {
+      try {
+        final c = await Binance.klines(s, '1d');
+        if (c.length < 300) {
+          failures.add('$s: کمتر از ۳۰۰ کندل روزانه');
+        } else {
+          rows.add(analyzeDaily(s, c));
+        }
+      } catch (e) {
+        failures.add('$s: $e');
+      }
+      done++;
+      onProgress?.call(done, syms.length);
+      await Future<void>.delayed(Duration.zero);
+    }
+    if (rows.isEmpty && failures.isNotEmpty) throw ApiException(failures.first);
+    return DailyData(rows, failures);
   }
 }

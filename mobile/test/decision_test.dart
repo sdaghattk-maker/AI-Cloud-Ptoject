@@ -133,4 +133,11 @@ void main() {
       expect(parseAiBrief('{ not valid json }'), isNull);
     });
   });
+
+  test('low timeframes are flagged because costs eat the edge', () {
+    final low = decisionForResult(res(edge: true)); // تایم‌فریم 1h
+    expect(low.checks.firstWhere((c) => c.label.contains('تایم‌فریم')).ok, false);
+    final high = decisionForSignal(sig()); // تایم‌فریم 4h
+    expect(high.checks.firstWhere((c) => c.label.contains('تایم‌فریم')).ok, true);
+  });
 }

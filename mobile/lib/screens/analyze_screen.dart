@@ -13,7 +13,7 @@ class AnalyzeScreen extends StatefulWidget {
 
 class _AnalyzeScreenState extends State<AnalyzeScreen> {
   final _symbol = TextEditingController(text: 'BTCUSDT');
-  String _tf = '1h';
+  String _tf = '4h';
   bool _loading = false;
   String? _error;
   AnalyzeResult? _result;

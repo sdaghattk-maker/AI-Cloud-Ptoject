@@ -29,7 +29,7 @@ class _ChartScreenState extends State<ChartScreen> {
   void initState() {
     super.initState();
     _symbol = widget.symbol ?? Settings.symbols.first;
-    _tf = widget.timeframe ?? '1h';
+    _tf = widget.timeframe ?? '4h';
     _load();
   }
 
